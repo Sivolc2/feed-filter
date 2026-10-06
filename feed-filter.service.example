@@ -1,0 +1,19 @@
+# systemd user unit. Copy to ~/.config/systemd/user/feed-filter.service, then:
+#   systemctl --user enable --now feed-filter
+[Unit]
+Description=Feed filter judge
+After=network.target
+
+[Service]
+WorkingDirectory=%h/feed-filter
+ExecStart=/usr/bin/python3 server.py
+Restart=on-failure
+RestartSec=3
+# Bind to a private address only (loopback, or a VPN/tailnet address). The server has no login.
+Environment=FEED_HOST=127.0.0.1
+# The key can also live in %h/feed-filter/.env, or come from a secrets manager wrapped around ExecStart.
+Environment=OPENROUTER_API_KEY=replace-me
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

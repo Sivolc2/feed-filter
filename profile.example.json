@@ -1,0 +1,12 @@
+{
+  "keep": "Decide whether a video or post is a high-signal use of this viewer's attention. The viewer WANTS: [list the subjects you care about, for example: new AI research and tools, physics and mathematics with good visual explanation, how the world works explained with data]. Substantive explainers, talks, papers, demos and news on real developments are good signs. The viewer wants to AVOID: clickbait and hype without substance, outrage and drama, reaction content, listicles, shallow rehash, engagement bait, celebrity gossip, and ads. Is this item worth the viewer's attention?",
+  "searches": [
+    "physics explained",
+    "math visualization",
+    "engineering deep dive"
+  ],
+  "channels": [
+    "@3blue1brown",
+    "@kurzgesagt"
+  ]
+}

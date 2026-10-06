@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { width: 230px; margin: 0; padding: 12px; background: #0f1012; color: #e6e3dc; font: 13px/1.5 system-ui, sans-serif; }
+  label { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  a { color: #d9b36a; cursor: pointer; }
+  #msg { color: #c9736b; }
+</style>
+</head>
+<body>
+  <label><input type="checkbox" id="enabled"> Filter on</label>
+  <label><input type="checkbox" id="block_shorts"> Black out Shorts</label>
+  <label><input type="radio" name="mode" value="fast"> Fast (Jev)</label>
+  <label><input type="radio" name="mode" value="smart"> Smart (Claude)</label>
+  <div id="msg"></div>
+  <a id="options">Settings and calibration</a>
+  <script src="popup.js"></script>
+</body>
+</html>

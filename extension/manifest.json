@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Feed filter",
+  "version": "0.5",
+  "description": "Blacks out YouTube and X feed items that don't match criteria you write, scored by a fast classifier with your own OpenRouter key.",
+  "permissions": ["storage", "unlimitedStorage"],
+  "host_permissions": ["https://openrouter.ai/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_page": "options.html",
+  "action": { "default_popup": "popup.html" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*", "https://x.com/*", "https://twitter.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

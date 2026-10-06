@@ -1,0 +1,8 @@
+# personal: your criteria, your key, your history, your deployment
+profile.json
+.env
+data/
+feed-filter.service
+*.zip
+__pycache__/
+.DS_Store

@@ -1,0 +1,26 @@
+[data-ff] { position: relative !important; }
+.ff-veil {
+  display: none; position: absolute; inset: 0; z-index: 2000; background: #000; color: #555;
+  font: 12px/1.3 system-ui, sans-serif; align-items: center; justify-content: center; text-align: center;
+  padding: 8px; cursor: pointer; border-radius: 8px;
+}
+[data-ff="pending"] > .ff-veil, [data-ff="hide"] > .ff-veil { display: flex; }
+.ff-badge {
+  display: none; position: absolute; top: 4px; right: 4px; z-index: 2001; gap: 4px; align-items: center;
+  background: rgba(0, 0, 0, .8); color: #ccc; font: 11px/1 system-ui, sans-serif; padding: 3px 5px; border-radius: 6px; opacity: .35;
+}
+[data-ff="keep"] > .ff-badge, [data-ff="hide"] > .ff-badge { display: flex; }
+.ff-badge:hover { opacity: 1; }
+.ff-badge button { all: unset; cursor: pointer; padding: 1px 3px; font-size: 12px; }
+html.ff-noshorts ytd-rich-shelf-renderer[is-shorts], html.ff-noshorts ytd-reel-shelf-renderer,
+html.ff-noshorts grid-shelf-view-model:has(a[href^="/shorts/"]) { display: none !important; }
+html.ff-on ytd-ad-slot-renderer, html.ff-on ytd-search-pyv-renderer, html.ff-on ytd-in-feed-ad-layout-renderer,
+html.ff-on ytd-rich-item-renderer:has(ytd-ad-slot-renderer) { display: none !important; }
+/* YouTube plays hover previews in a floating player outside the tile, which would cover the veil. */
+html.ff-on ytd-video-preview { display: none !important; }
+/* A cast vote stays lit on its button, and the badge stops fading. */
+[data-ff-vote="up"] > .ff-badge, [data-ff-vote="down"] > .ff-badge { opacity: 1; }
+.ff-badge button { border-radius: 4px; }
+[data-ff-vote="up"] > .ff-badge .ff-up { background: #2e7d4f; box-shadow: 0 0 0 1px #7fc79a; animation: ff-pop .3s; }
+[data-ff-vote="down"] > .ff-badge .ff-down { background: #8a3a34; box-shadow: 0 0 0 1px #c9736b; animation: ff-pop .3s; }
+@keyframes ff-pop { 50% { transform: scale(1.5); } }

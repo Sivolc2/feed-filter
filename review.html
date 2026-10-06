@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feed filter</title>
+<style>
+  :root { --bg:#0f1012; --panel:#17191d; --line:#272a30; --text:#e6e3dc; --dim:#8a8d94; --keep:#7fc79a; --skip:#c9736b; --accent:#d9b36a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 940px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 20px; margin: 0 0 16px; font-weight: 600; letter-spacing: .01em; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  input[type=text] { flex:1; min-width:180px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:8px 10px; font:inherit; }
+  button, select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:7px 12px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.on { border-color:var(--accent); color:var(--accent); }
+  button:disabled { opacity:.5; cursor:wait; }
+  label { color:var(--dim); font-size:13px; display:flex; gap:6px; align-items:center; }
+  #status { color:var(--dim); font-size:13px; }
+  #cal { font-size:13px; color:var(--dim); margin-top:10px; }
+  #keep, #proposal pre { white-space:pre-wrap; font:13px/1.5 ui-sans-serif, system-ui, sans-serif; color:var(--dim); margin:10px 0 0; }
+  #proposal { display:none; border-top:1px solid var(--line); margin-top:12px; padding-top:12px; }
+  #proposal pre { color:var(--text); }
+  .item { display:grid; grid-template-columns: 52px 1fr auto; gap:12px; align-items:center; padding:9px 4px; border-bottom:1px solid var(--line); }
+  .p { font-variant-numeric: tabular-nums; font-weight:600; text-align:right; }
+  .item.keep .p { color:var(--keep); } .item.skip .p { color:var(--skip); }
+  .item.skip .title { color:var(--dim); }
+  .title a { color:inherit; text-decoration:none; overflow-wrap:anywhere; } .title a:hover { text-decoration:underline; }
+  .meta { font-size:12px; color:var(--dim); }
+  .votes button { padding:4px 9px; }
+  .votes button.up.on { border-color:var(--keep); color:var(--keep); } .votes button.down.on { border-color:var(--skip); color:var(--skip); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Feed filter</h1>
+
+  <div class="panel">
+    <div class="row">
+      <input type="text" id="term" placeholder="Scan YouTube for a term…">
+      <button id="scan">Scan</button>
+      <button id="scanAll">Scan my profile searches</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label><input type="checkbox" id="enabled"> Filter on</label>
+      <label><input type="checkbox" id="shorts"> Black out Shorts</label>
+      <button id="fast">Fast (Jev)</button>
+      <button id="smart">Smart (Claude)</button>
+      <label>Keep at ≥ <input type="range" id="threshold" min="0.05" max="0.95" step="0.05"> <span id="tval"></span></label>
+      <span id="status"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <strong>Calibration</strong>
+      <button id="useBest" style="display:none"></button>
+      <button id="refine">Refine criteria from my votes</button>
+    </div>
+    <div id="cal"></div>
+    <div id="keep"></div>
+    <div id="proposal">
+      <div id="propStats" class="meta"></div>
+      <pre id="propText"></pre>
+      <div class="row" style="margin-top:10px"><button id="apply">Apply</button><button id="discard">Discard</button></div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-bottom:6px">
+    <select id="source"><option value="">All sources</option><option value="scan">Scans</option><option value="youtube">YouTube feed</option><option value="x">X feed</option></select>
+    <select id="show"><option value="all">Kept and filtered</option><option value="keep">Kept only</option><option value="skip">Filtered only</option><option value="unvoted">Not voted yet</option></select>
+    <span id="count" class="meta"></span>
+  </div>
+  <div id="list"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let data = null, proposal = null;
+
+async function api(path, body) {
+  const res = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  return json;
+}
+
+async function busy(button, label, fn) {
+  const old = button.textContent;
+  button.disabled = true; button.textContent = label; $('status').textContent = '';
+  try { await fn(); } catch (e) { $('status').textContent = e.message; }
+  button.disabled = false; button.textContent = old;
+}
+
+async function load() { data = await api('/api/items'); render(); }
+
+function render() {
+  const s = data.state, c = data.calibration;
+  $('enabled').checked = s.enabled; $('shorts').checked = s.block_shorts;
+  $('fast').classList.toggle('on', s.mode === 'fast'); $('smart').classList.toggle('on', s.mode === 'smart');
+  $('threshold').value = s.threshold; $('tval').textContent = s.threshold.toFixed(2);
+  $('keep').textContent = data.keep;
+  const pct = x => Math.round(x * 100) + '%';
+  $('cal').textContent = c.votes
+    ? `${c.votes} votes. The ${s.mode} judge agrees with ${pct(c.agreement)} of them at ${s.threshold.toFixed(2)}.`
+    : 'No votes yet. Vote on items below and the judge can be tuned to match.';
+  const better = c.votes && c.best_agreement > c.agreement;
+  $('useBest').style.display = better ? '' : 'none';
+  if (better) $('useBest').textContent = `Use ${c.best_threshold.toFixed(2)} (${pct(c.best_agreement)})`;
+
+  const src = $('source').value, show = $('show').value;
+  const items = data.items.filter(it => it.p !== null && (!src || it.source === src)).map(it => ({ ...it, keep: it.vote ? it.vote > 0 : it.p >= s.threshold }))
+    .filter(it => show === 'all' || (show === 'unvoted' ? !it.vote : (show === 'keep') === it.keep))
+    .sort((a, b) => b.p - a.p);
+  $('count').textContent = `${items.length} items`;
+  $('list').replaceChildren(...items.map(row));
+}
+
+function row(it) {
+  const el = document.createElement('div');
+  el.className = 'item ' + (it.keep ? 'keep' : 'skip');
+  const p = document.createElement('div'); p.className = 'p'; p.textContent = it.p.toFixed(2);
+  const mid = document.createElement('div'); mid.className = 'title';
+  const a = document.createElement('a'); a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = it.text;
+  const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = it.source + (it.q ? ' · ' + it.q : '');
+  mid.append(a, meta);
+  const votes = document.createElement('div'); votes.className = 'votes';
+  for (const [cls, label, v] of [['up', '👍', 1], ['down', '👎', -1]]) {
+    const b = document.createElement('button'); b.className = cls + (it.vote === v ? ' on' : ''); b.textContent = label;
+    b.onclick = async () => { await api('/api/vote', { id: it.id, vote: it.vote === v ? null : v }); load(); };
+    votes.append(b);
+  }
+  el.append(p, mid, votes);
+  return el;
+}
+
+const setState = async changes => { await api('/api/state', changes); load(); };
+$('enabled').onchange = e => setState({ enabled: e.target.checked });
+$('shorts').onchange = e => setState({ block_shorts: e.target.checked });
+$('fast').onclick = () => setState({ mode: 'fast' });
+$('smart').onclick = () => setState({ mode: 'smart' });
+$('threshold').oninput = e => { $('tval').textContent = (+e.target.value).toFixed(2); };
+$('threshold').onchange = e => setState({ threshold: +e.target.value });
+$('useBest').onclick = () => setState({ threshold: data.calibration.best_threshold });
+$('source').onchange = $('show').onchange = render;
+$('scan').onclick = () => busy($('scan'), 'Scanning…', async () => { await api('/api/scan', { term: $('term').value.trim() || undefined }); await load(); });
+$('term').onkeydown = e => { if (e.key === 'Enter') $('scan').click(); };
+$('scanAll').onclick = () => busy($('scanAll'), 'Scanning…', async () => { await api('/api/scan', {}); await load(); });
+$('refine').onclick = () => busy($('refine'), 'Refining…', async () => {
+  proposal = await api('/api/refine', {});
+  const pct = x => Math.round(x * 100) + '%';
+  $('propStats').textContent = `Jev agreement on your ${proposal.votes} votes: ${pct(proposal.before.agreement)} now, ${pct(proposal.after.agreement)} with this rewrite (threshold ${proposal.after.threshold.toFixed(2)}). Measured on the same votes it was written from.`;
+  $('propText').textContent = proposal.keep;
+  $('proposal').style.display = 'block';
+});
+$('discard').onclick = () => { $('proposal').style.display = 'none'; };
+$('apply').onclick = () => busy($('apply'), 'Applying…', async () => {
+  await api('/api/keep', { keep: proposal.keep, threshold: proposal.after.threshold });
+  $('proposal').style.display = 'none';
+  await load();
+});
+load();
+</script>
+</body>
+</html>
