@@ -1,4 +1,4 @@
-# Feed filter
+# Feed filter (extension)
 
 A Chrome/Brave extension that blacks out YouTube and X feed items that don't match criteria
 you write in plain English. A fast classifier (TypeSafe's Jev) scores each title or post in
@@ -9,26 +9,40 @@ about a third of a second; your 👍/👎 votes tune it.
 1. Get an OpenRouter API key at https://openrouter.ai/keys and add a few dollars of credit. Fast mode costs roughly $0.02 per thousand items.
 2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose this folder.
 3. The settings page opens. Paste your key, press **Save**, then **Test**.
-4. Edit the criteria under "What to keep" to describe what you want and what you want to avoid, and save.
+4. Under "What to keep", pick a starting profile or write your own, and save.
 5. Open YouTube or X. Tiles go black while they are checked and stay black if they fail.
 
 ## Use
 
-- Click a black tile to peek. Use the 👍 👎 badge in a tile's corner to correct the judge.
-- A 👎 on a feed tile also picks "Not interested" in that tile's own YouTube or X menu, so the site hears it too. This works with the sites in English and can be switched off in settings. Votes made on the settings page don't do this.
-- After a few dozen votes, open the settings page (toolbar icon, "Settings and calibration") and press **Refine criteria from my votes**. It rewrites your criteria, shows how well the rewrite matches your votes, and changes nothing until you press Apply.
-- Fast mode uses Jev. Smart mode uses Claude Sonnet through the same key: slower, costs more, sometimes better on subtle cases.
-- Shorts, ad slots and YouTube's hover previews are hidden while the filter is on.
+- **Peek and vote.** Click a black tile to peek. Use the 👍 👎 badge in a tile's corner to correct the judge; the button you pressed stays lit.
+- **Tell the site too.** A 👎 on a feed tile also picks "Not interested" in that tile's own YouTube or X menu. This needs the sites in English and can be switched off. Votes made on the settings page don't do this.
+- **Refine.** After a few dozen votes, press **Refine criteria from my votes** on the settings page. It rewrites your criteria, shows how well the rewrite matches your votes, and changes nothing until you press Apply.
+- **Lists.** Put channel names or @handles under "Always keep" or "Never keep", one per line. They skip the judge.
+- **Where to filter.** Tick the kinds of page to filter. By default that is the home feeds, search, and YouTube's watch sidebar.
+- **Fast or smart.** Fast mode uses Jev. Smart mode uses Claude Sonnet through the same key: slower, costs more, sometimes better on subtle cases.
+- **Cost.** The settings page shows items seen, share filtered and dollars spent. "Stop after N newly scored items a day" is a hard cap; verdicts already known keep applying after it is reached.
+- **Move or share a setup.** Export writes criteria, settings and votes to a file, without the key. Import reads one back.
+
+Shorts, ad slots and YouTube's hover previews are hidden on pages where the filter is on.
+
+## When something is wrong
+
+The feed is left unfiltered and a notice appears at the bottom right saying why: no key, a
+rejected key, no credit, rate limiting, or no connection. The toolbar icon shows "!" and the
+popup repeats the message.
 
 ## Privacy
 
-Titles, channel names and post text from the feeds you view are sent to openrouter.ai to be
-scored (TypeSafe in fast mode, Anthropic in smart mode). Your key, criteria, votes and history
-stay in this browser profile; the key is stored unencrypted. If the judge can't be reached,
-feeds are left unfiltered.
+Titles, channel names and post text from the kinds of page you switched on are sent to
+openrouter.ai to be scored (TypeSafe in fast mode, Anthropic in smart mode). Posts from
+protected X accounts are never read. Your key, criteria, votes and history stay in this
+browser profile; the key is stored unencrypted and only this extension's own pages can read it.
 
 ## Files
 
-`content.js` and `content.css` read and veil tiles. `background.js` routes requests to
-`local.js` (the judge) or, if you set a server URL under Advanced, to your own server.
-`options.*` is the settings and calibration page, `popup.*` the toolbar menu.
+| File | Role |
+|---|---|
+| `content.js`, `content.css` | Read tiles on the page, veil them, show the vote badge and notices. |
+| `background.js` | Routes every request, checks who is asking, applies lists, caps and stats. |
+| `local.js` | The judge: calls OpenRouter, caches scores, calibrates. |
+| `options.*`, `popup.*` | Settings and calibration page, toolbar menu. |

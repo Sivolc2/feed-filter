@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Feed (test fixture)</title>
+<style>
+  body { margin:0; background:#0f0f0f; color:#f1f1f1; font:14px/1.4 Roboto, system-ui, sans-serif; }
+  header { padding:14px 24px; font-size:18px; font-weight:600; border-bottom:1px solid #222; }
+  #grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:20px 16px; padding:24px; }
+  ytd-rich-item-renderer, ytd-ad-slot-renderer, ytd-rich-shelf-renderer { display:block; }
+  .thumb { display:block; aspect-ratio:16/9; border-radius:12px; margin-bottom:10px; }
+  h3 { margin:0 0 4px; font-size:15px; font-weight:500; }
+  ytd-channel-name a { color:#aaa; text-decoration:none; font-size:13px; }
+  .row { display:flex; justify-content:space-between; gap:8px; }
+  button[aria-label="More actions"] { background:none; border:0; color:#aaa; cursor:pointer; font-size:18px; }
+  [role=menu] { position:fixed; background:#282828; border-radius:10px; padding:6px 0; z-index:5000; box-shadow:0 4px 20px #000; }
+  [role=menuitem] { display:block; width:100%; background:none; border:0; color:#f1f1f1; padding:8px 18px; text-align:left; font:inherit; cursor:pointer; }
+  ytd-rich-shelf-renderer { grid-column:1/-1; padding:10px; border:1px dashed #333; border-radius:12px; }
+</style>
+</head>
+<body>
+<header>Home</header>
+<div id="grid"></div>
+<script>
+  // Mirrors the parts of YouTube's markup the extension relies on, as observed on the live site.
+  const HUES = [200, 20, 280, 140, 340, 50, 180, 0, 100, 240, 310, 70];
+  const VIDEOS = window.__videos = [
+    ['v1', 'Reinventing Entropy | Compression is Intelligence', 'GridMath'],
+    ['v2', 'The CRAZIEST week in tech EVER (you won\'t believe #4)', 'HypeDaily'],
+    ['v3', 'Why Navier-Stokes Pushes Math and Physics to the Edge', 'Quanta Clips'],
+    ['v4', 'Reacting to the WORST takes on the internet', 'ReactorTV'],
+    ['v5', 'How a fusion reactor actually confines plasma', 'Plasma Lab'],
+    ['v6', '10 habits of millionaires that will SHOCK you', 'Hustle Hub'],
+    ['v7', 'Building a CPU from logic gates, part 3', 'Bench Notes'],
+    ['v8', 'Celebrity DRAMA explodes after awards night', 'GossipNow'],
+    ['v9', 'A visual tour of the Fourier transform', 'GridMath'],
+    ['v10', 'This gadget is INSANE (not clickbait)', 'HypeDaily'],
+    ['v11', 'Mapping every neuron in a fruit fly brain', 'Lab Reports'],
+    ['v12', 'I tried the viral 5am routine for 30 days', 'Hustle Hub'],
+  ];
+  const grid = document.getElementById('grid');
+  window.__notInterested = [];
+  window.__navigated = [];
+
+  function fill(tile, [id, title, channel], i = 0) {
+    tile.replaceChildren();
+    const thumb = document.createElement('a');
+    thumb.className = 'thumb'; thumb.href = '/watch?v=' + id;
+    thumb.style.background = `linear-gradient(135deg, hsl(${HUES[i % 12]} 60% 35%), hsl(${(HUES[i % 12] + 60) % 360} 60% 20%))`;
+    thumb.addEventListener('click', e => { e.preventDefault(); window.__navigated.push(id); });
+    const row = document.createElement('div'); row.className = 'row';
+    const words = document.createElement('div');
+    const h3 = document.createElement('h3'); h3.id = 'video-title'; h3.textContent = title;
+    const name = document.createElement('ytd-channel-name');
+    const link = document.createElement('a'); link.href = '/@' + channel.replace(/\s/g, ''); link.textContent = channel;
+    link.addEventListener('click', e => e.preventDefault());
+    name.append(link); words.append(h3, name);
+    const more = document.createElement('button'); more.setAttribute('aria-label', 'More actions'); more.textContent = '⋮';
+    // Like the real site, the menu needs a pointerdown before the click.
+    let armed = false;
+    more.addEventListener('pointerdown', () => { armed = true; });
+    more.addEventListener('click', e => { if (!armed) return; armed = false; openMenu(e.target, id, tile); });
+    row.append(words, more);
+    tile.append(thumb, row);
+  }
+
+  function openMenu(anchor, id, tile) {
+    document.querySelector('[role=menu]')?.remove();
+    const menu = document.createElement('div'); menu.setAttribute('role', 'menu');
+    const box = anchor.getBoundingClientRect();
+    menu.style.left = Math.max(0, box.left - 150) + 'px'; menu.style.top = box.bottom + 'px';
+    for (const label of ['Add to queue', 'Save to Watch later', 'Not interested', "Don't recommend channel"]) {
+      const item = document.createElement('button'); item.setAttribute('role', 'menuitem'); item.textContent = label;
+      item.addEventListener('click', () => {
+        menu.remove();
+        if (label === 'Not interested') { window.__notInterested.push(id); tile.replaceChildren('Video removed'); }
+        if (label.startsWith("Don't")) window.__blockedChannel = id;
+      });
+      menu.append(item);
+    }
+    document.body.append(menu);
+  }
+
+  function add(video, i) {
+    const tile = document.createElement('ytd-rich-item-renderer');
+    fill(tile, video, i);
+    grid.append(tile);
+    return tile;
+  }
+
+  const count = Number(new URLSearchParams(location.search).get('n') || VIDEOS.length);
+  VIDEOS.slice(0, count).forEach(add);
+
+  if (!location.search.includes('plain')) {
+    const ad = document.createElement('ytd-ad-slot-renderer'); ad.textContent = 'Sponsored: buy things'; grid.append(ad);
+    const shelf = document.createElement('ytd-rich-shelf-renderer'); shelf.setAttribute('is-shorts', ''); shelf.textContent = 'Shorts shelf'; grid.append(shelf);
+    const short = document.createElement('ytd-rich-item-renderer');
+    const a = document.createElement('a'); a.href = '/shorts/s1'; a.className = 'thumb'; a.style.background = '#333';
+    const h = document.createElement('h3'); h.textContent = 'A short';
+    short.append(a, h); grid.append(short);
+    // Hostile content: markup in a title, an id that is not an id, a javascript: link.
+    add(['x1', '<img src=x onerror="window.__xss=1"> GOOD <script>window.__xss=2<\/script>', '<b>Mallory</b>'], 3);
+    add(['bad id" onmouseover="x', 'Tile with a malformed id', 'Mallory'], 4);
+    const evil = document.createElement('ytd-rich-item-renderer');
+    const ea = document.createElement('a'); ea.setAttribute('href', 'javascript:alert(1)//watch?v=zz'); ea.className = 'thumb';
+    const eh = document.createElement('h3'); eh.textContent = 'javascript link tile';
+    evil.append(ea, eh); grid.append(evil);
+  }
+
+  // Hooks the tests use to imitate what the live site does to tiles.
+  window.__more = (n = 4) => { for (let i = 0; i < n; i++) add(['late' + i, 'Late arrival number ' + i, 'Lazy Loader'], i); };
+  window.__rerender = id => {
+    const tile = [...grid.children].find(t => t.querySelector(`a[href="/watch?v=${id}"]`));
+    tile.className = ''; tile.removeAttribute('data-ff');
+    fill(tile, VIDEOS.find(v => v[0] === id));
+  };
+  window.__reuse = (oldId, video) => {
+    const tile = [...grid.children].find(t => t.querySelector(`a[href="/watch?v=${oldId}"]`));
+    for (const el of [...tile.children]) if (!el.className.startsWith('ff-')) el.remove();
+    const extras = [...tile.children];
+    fill(tile, video); tile.append(...extras);
+  };
+  window.__dup = id => add(VIDEOS.find(v => v[0] === id), 5);
+  window.__go = path => { history.pushState({}, '', path); grid.append(document.createComment('nav')); };
+  // A hostile page script trying to cast votes and peek on the person's behalf.
+  window.__forge = () => {
+    for (const b of document.querySelectorAll('.ff-down, .ff-up, .ff-veil')) b.click();
+    for (const b of document.querySelectorAll('.ff-down')) b.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  };
+</script>
+</body>
+</html>

@@ -122,7 +122,8 @@ function row(it) {
   el.className = 'item ' + (it.keep ? 'keep' : 'skip');
   const p = document.createElement('div'); p.className = 'p'; p.textContent = it.p.toFixed(2);
   const mid = document.createElement('div'); mid.className = 'title';
-  const a = document.createElement('a'); a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = it.text;
+  const a = document.createElement('a'); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = it.text;
+  if (/^https:\/\//.test(it.url)) a.href = it.url;
   const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = it.source + (it.q ? ' · ' + it.q : '');
   mid.append(a, meta);
   const votes = document.createElement('div'); votes.className = 'votes';

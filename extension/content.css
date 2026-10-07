@@ -24,3 +24,10 @@ html.ff-on ytd-video-preview { display: none !important; }
 [data-ff-vote="up"] > .ff-badge .ff-up { background: #2e7d4f; box-shadow: 0 0 0 1px #7fc79a; animation: ff-pop .3s; }
 [data-ff-vote="down"] > .ff-badge .ff-down { background: #8a3a34; box-shadow: 0 0 0 1px #c9736b; animation: ff-pop .3s; }
 @keyframes ff-pop { 50% { transform: scale(1.5); } }
+#ff-notice {
+  position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; max-width: 380px; display: flex; gap: 10px; align-items: center;
+  background: #17191d; color: #e6e3dc; border: 1px solid #c9736b; border-radius: 10px; padding: 10px 12px;
+  font: 13px/1.4 system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0, 0, 0, .5);
+}
+#ff-notice button { all: unset; cursor: pointer; color: #d9b36a; white-space: nowrap; }
+[data-ff-vote="none"] > .ff-badge { display: none !important; }

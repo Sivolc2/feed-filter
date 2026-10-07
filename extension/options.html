@@ -9,21 +9,32 @@
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 ui-sans-serif, system-ui, sans-serif; }
   main { max-width: 940px; margin: 0 auto; padding: 24px 16px 80px; }
-  h1 { font-size: 20px; margin: 0 0 16px; font-weight: 600; }
+  h1 { font-size: 20px; margin: 0 0 16px; font-weight: 600; display:flex; gap:10px; align-items:center; }
+  h1 img { width:28px; height:28px; }
   h2 { font-size: 14px; margin: 0 0 10px; font-weight: 600; }
+  h3 { font-size: 13px; margin: 0 0 6px; font-weight: 600; color:var(--dim); }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
   .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-  input[type=text], input[type=password], textarea { flex:1; min-width:180px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:8px 10px; font:inherit; }
-  textarea { width:100%; min-height:150px; font-size:13px; line-height:1.5; resize:vertical; }
+  .cols { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+  @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } }
+  input[type=text], input[type=password], input[type=number], textarea { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:8px 10px; font:inherit; }
+  input[type=text], input[type=password] { flex:1; min-width:180px; }
+  input[type=number] { width:100px; }
+  textarea { width:100%; font-size:13px; line-height:1.5; resize:vertical; }
+  #keep { min-height:150px; } .list { min-height:90px; }
   button, select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:7px 12px; font:inherit; cursor:pointer; }
   button:hover { border-color:var(--accent); }
   button.on { border-color:var(--accent); color:var(--accent); }
+  button.small { padding:4px 10px; font-size:13px; }
   button:disabled { opacity:.5; cursor:wait; }
   label { color:var(--dim); font-size:13px; display:flex; gap:6px; align-items:center; }
-  .hint, #cal, #count, .meta { color:var(--dim); font-size:13px; }
+  .hint, #cal, #count, .meta, #stats { color:var(--dim); font-size:13px; }
   .hint { margin:8px 0 0; } .hint a { color:var(--accent); }
-  #status { color:var(--skip); font-size:13px; min-height:1.4em; margin-bottom:8px; }
+  #status { color:var(--skip); font-size:13px; }
+  #status:not(:empty) { border:1px solid var(--skip); border-radius:8px; padding:8px 12px; margin-bottom:12px; }
+  #stats { margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
   details { margin-top:10px; } summary { color:var(--dim); font-size:13px; cursor:pointer; }
+  .checks { display:flex; flex-wrap:wrap; gap:6px 16px; margin-bottom:10px; }
   #proposal { display:none; border-top:1px solid var(--line); margin-top:12px; padding-top:12px; }
   #propText { white-space:pre-wrap; font-size:13px; margin:8px 0 0; }
   .item { display:grid; grid-template-columns: 52px 1fr auto; gap:12px; align-items:center; padding:9px 4px; border-bottom:1px solid var(--line); }
@@ -38,8 +49,8 @@
 </head>
 <body>
 <main>
-  <h1>Feed filter</h1>
-  <div id="status"></div>
+  <h1><img src="icons/icon48.png" alt="">Feed filter</h1>
+  <div id="status" role="alert"></div>
 
   <div class="panel">
     <h2>1. Your key</h2>
@@ -56,29 +67,55 @@
         <input type="text" id="serverUrl" placeholder="http://host:8953 (leave empty to use the key above)">
         <button id="saveServer">Save</button>
       </div>
-      <p class="hint" id="serverHint" style="display:none">Scans run on the server. <a id="serverLink" target="_blank" rel="noopener">Open its review page</a>.</p>
+      <p class="hint" id="serverHint" style="display:none">Criteria, history and scans live on the server. <a id="serverLink" target="_blank" rel="noopener">Open its review page</a>.</p>
     </details>
   </div>
 
   <div class="panel">
     <h2>2. What to keep</h2>
+    <div class="row" style="margin-bottom:10px">
+      <span class="meta">Start from:</span>
+      <span id="presets" class="row"></span>
+    </div>
     <textarea id="keep" spellcheck="false"></textarea>
     <div class="row" style="margin-top:10px">
       <button id="saveKeep">Save criteria</button>
       <label><input type="checkbox" id="enabled"> Filter on</label>
-      <label><input type="checkbox" id="shorts"> Black out Shorts</label>
-      <label><input type="checkbox" id="signal"> A 👎 in the feed also tells the site "Not interested"</label>
       <button id="fast">Fast (Jev)</button>
       <button id="smart">Smart (Claude)</button>
       <label>Keep at ≥ <input type="range" id="threshold" min="0.05" max="0.95" step="0.05"> <span id="tval"></span></label>
     </div>
+    <div id="stats"></div>
+    <div class="row" style="margin-top:8px">
+      <label>Stop after <input type="number" id="dailyCap" min="0" step="100"> newly scored items a day</label>
+    </div>
   </div>
 
   <div class="panel">
-    <h2>3. Calibrate</h2>
+    <h2>3. Where to filter</h2>
+    <h3>YouTube</h3>
+    <div class="checks" id="pages-youtube"></div>
+    <h3>X</h3>
+    <div class="checks" id="pages-x"></div>
+    <div class="checks">
+      <label><input type="checkbox" id="shorts"> Black out Shorts</label>
+      <label><input type="checkbox" id="signal"> A 👎 in the feed also tells the site "Not interested"</label>
+    </div>
+    <div class="cols">
+      <div><h3>Always keep</h3><textarea class="list" id="always" spellcheck="false" placeholder="One channel name or @handle per line"></textarea></div>
+      <div><h3>Never keep</h3><textarea class="list" id="never" spellcheck="false" placeholder="One channel name or @handle per line"></textarea></div>
+    </div>
+    <div class="row" style="margin-top:10px"><button id="saveLists">Save lists</button><span class="meta">Listed sources skip the judge, so they cost nothing. Page and list changes apply when you next load a feed.</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>4. Calibrate</h2>
     <div class="row">
       <button id="useBest" style="display:none"></button>
       <button id="refine">Refine criteria from my votes</button>
+      <button id="export" style="margin-left:auto">Export</button>
+      <button id="import">Import…</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
     </div>
     <div id="cal" style="margin-top:10px"></div>
     <div id="proposal">
@@ -96,6 +133,6 @@
   </div>
   <div id="list"></div>
 </main>
-<script src="options.js"></script>
+<script type="module" src="options.js"></script>
 </body>
 </html>
