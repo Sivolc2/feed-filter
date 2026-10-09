@@ -1,7 +1,8 @@
 # Feed filter
 
-Blacks out YouTube and X feed items that don't match criteria you write in plain English,
-so the feed you see is closer to what you came for.
+Blacks out feed items that don't match criteria you write in plain English, so the feed you
+see is closer to what you came for. Works on YouTube, X, Reddit, Hacker News, Bluesky,
+Threads, Facebook and LinkedIn.
 
 ![Feed tiles being checked, veiled or kept, then peeked at and voted on](docs/demo.gif)
 
@@ -20,14 +21,29 @@ Standalone. Works in Chrome, Brave and other Chromium browsers with your own Ope
 2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, choose the `extension/` folder.
 3. The settings page opens. Paste the key, **Save**, **Test**.
 4. Pick a starting profile or describe what you want under "What to keep", and save.
-5. Open YouTube or X.
+5. Open any supported site.
+
+| Site | Filtered by default | Checked against the real site |
+|---|---|---|
+| YouTube | Home, search, watch sidebar | Search page by automated test; logged-in home by hand |
+| X | Home timeline, search | Logged-in timeline by hand |
+| Hacker News | Front page, New, Ask, Show | Automated test |
+| Bluesky | Home feeds, search | Automated test (logged out) |
+| Threads | Home feeds, search | Automated test (logged out) |
+| Facebook | Home feed, public posts only | Automated test on a public page; not the logged-in home feed |
+| Reddit | Home, Popular, subreddit listings, search | Not yet: Reddit blocks automated browsers |
+| LinkedIn | Nothing until you switch it on | Not yet: needs a login |
+
+Sites marked "not yet" are built from the markup those sites are known to use. If one does
+nothing, its markup has changed; please open an issue. Instagram and TikTok are not supported:
+their feeds are mostly images and video with little text for a judge to read.
 
 What you get:
 
 - **Veils, not removal.** Failing tiles go black with their score; click one to peek. Shorts and ad slots are hidden.
 - **Votes that teach.** 👍/👎 on any tile or in the settings page. "Refine criteria from my votes" rewrites your criteria and shows how well the rewrite matches before you apply it. A 👎 on a tile can also tell the site "Not interested".
-- **Always-keep and never-keep lists** for channels and accounts. Listed sources skip the judge and cost nothing.
-- **Per-page switches.** Home feeds, search and the watch sidebar are filtered by default; subscriptions, channels, history, profiles and threads are left alone unless you switch them on.
+- **Always-keep and never-keep lists** for channels, @handles, subreddits (`r/name`), Reddit users (`u/name`) and Hacker News sites (`example.com`). Listed sources skip the judge and cost nothing.
+- **Per-site, per-page switches.** Home feeds and search are filtered by default; subscriptions, profiles, comment threads and other pages are left alone unless you switch them on.
 - **Usage and cost** for today and the last 30 days, with a daily cap on newly scored items.
 - **Clear failures.** If the key is missing, out of credit or rate-limited, the feed is left unfiltered and a notice says why.
 - **Export and import** of criteria, settings and votes as one file. The key is never in it.
@@ -70,7 +86,13 @@ Then set that URL under **Advanced** in the extension's settings.
 
 Titles, channel names and post text from the pages you have switched on are sent to
 openrouter.ai to be scored: by TypeSafe in fast mode, by Anthropic in smart mode. Nothing
-else leaves your machine. Posts from protected X accounts are never read. Keep personal
+else leaves your machine.
+
+Posts that are not public are not read where the site says so: protected accounts on X, and
+on Facebook anything not marked "Shared with Public" (friends-only and private-group posts).
+Threads and LinkedIn give no such marker in the feed, so posts there from private accounts
+or visible to connections only would be sent if you filter those feeds; LinkedIn is off by
+default for that reason. Keep personal
 detail out of your criteria, since the criteria are sent with every item.
 
 ## Security model
@@ -89,7 +111,7 @@ Found a problem? Please open an issue.
 python3 tests/server_test.py             # attacks the server over HTTP, scoring stubbed
 cd tests && npm install && npx playwright install chromium
 node e2e.mjs                             # the real extension in Chromium on fixture pages
-LIVE=1 node e2e.mjs                      # also checks tile detection on the real youtube.com
+LIVE=1 node e2e.mjs                      # also checks tile detection on the real sites that load without a login
 ```
 
 Neither suite needs a key or spends anything.
@@ -97,8 +119,9 @@ Neither suite needs a key or spends anything.
 ## Known limits
 
 - The judge sees only the title and channel, or the post text and author. It cannot judge a video's content, length or date.
-- Tile detection depends on YouTube's and X's page markup and will need fixing when they change it. The tests cover the live YouTube search page; the logged-in home feed and X are covered by fixtures modelled on the live markup.
-- Passing a 👎 on to the site as "Not interested" finds the menu entry by its English label.
+- Tile detection depends on each site's page markup and will need fixing when they change it. The table above says how each site was checked; `extension/sites.js` is the one file to edit.
+- Passing a 👎 on to the site as "Not interested" works on YouTube and X only, and finds the menu entry by its English label.
+- On Facebook, posts are recognised by who wrote them and how they start, because Facebook hides post links. Text-less posts (photos, reels with no caption) are left alone.
 - Jev is served from an alpha OpenRouter endpoint that may change.
 - Scores are visible to the site's own scripts while a tile is on screen.
 - Hiding ad slots and scripted menu clicks may be against the sites' terms. Both only happen in your own browser; decide for yourself.

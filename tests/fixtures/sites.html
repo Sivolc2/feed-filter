@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Feed (test fixture)</title>
+<style>body { margin:0; background:#111; color:#eee; font:14px/1.4 system-ui, sans-serif; } #feed { max-width:640px; margin:0 auto; } #feed > * { display:block; padding:12px; border-bottom:1px solid #333; } table { width:100%; }</style>
+</head>
+<body>
+<div id="feed"></div>
+<script>
+  // One fixture for the simpler sites. Each branch mirrors the markup the extension relies on,
+  // as observed on the live site (or, for Reddit and LinkedIn, as documented).
+  const feed = document.getElementById('feed');
+  const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); e.append(...kids); return e; };
+  const host = location.host;
+  window.__clicked = [];
+
+  if (host === 'www.reddit.com') {
+    const post = (id, title, sub, author) => el('shreddit-post', { id: 't3_' + id, 'post-title': title, permalink: `/r/${sub}/comments/${id}/slug/`, 'subreddit-prefixed-name': 'r/' + sub, author }, el('a', { slot: 'title', href: `/r/${sub}/comments/${id}/slug/` }, title));
+    feed.append(
+      post('a1', 'A GOOD explanation of orbital mechanics', 'physics', 'alice'),
+      post('a2', 'BAD rage thread you will hate', 'drama', 'bob'),
+      el('shreddit-ad-post', {}, 'Promoted: buy things'),
+      post('a3', 'Something GOOD from a muted subreddit', 'memes', 'carol'),
+      post('a4', 'Something BAD-looking from a trusted user', 'misc', 'TrustedUser'),
+      el('shreddit-post', { 'post-title': 'no id here GOOD', permalink: '/r/x/comments/zz/' }, 'no id'),
+      el('shreddit-post', { id: 't3_a5', 'post-title': 'GOOD title, hostile link', permalink: 'javascript:alert(1)', 'subreddit-prefixed-name': 'r/evil' }, 'x'),
+    );
+  } else if (host === 'news.ycombinator.com') {
+    const table = el('table'); const body = el('tbody'); table.append(body); feed.append(table);
+    const row = (id, title, site) => {
+      const line = el('span', { class: 'titleline' }, el('a', { href: 'https://' + (site || 'news.ycombinator.com') + '/x' }, title));
+      if (site) line.append(el('span', { class: 'sitebit comhead' }, ' (', el('a', { href: 'from?site=' + site }, el('span', { class: 'sitestr' }, site)), ')'));
+      body.append(el('tr', { class: 'athing submission', id }, el('td', { class: 'title' }, el('span', { class: 'rank' }, '1.')), el('td', { class: 'votelinks' }, '▲'), el('td', { class: 'title' }, line)),
+        el('tr', {}, el('td', { colspan: 2 }), el('td', { class: 'subtext' }, '120 points | 45 comments')));
+    };
+    row('5001', 'A GOOD deep dive into B-trees', 'example.org');
+    row('5002', 'BAD: ten hot takes on frameworks', 'hottakes.example');
+    row('5003', 'Ask HN: what GOOD books did you read?', '');
+    row('5004', 'A GOOD post from a blocked site', 'spam.example');
+    row('notanumber', 'Row with a GOOD title but a broken id', 'example.org');
+  } else if (host === 'bsky.app') {
+    const post = (handle, id, body) => { const p = el('div', { 'data-testid': 'feedItem-by-' + handle, role: 'link', tabindex: 0 }, el('a', { href: `/profile/${handle}/post/${id}` }, '3h')); if (body) p.append(el('div', { 'data-testid': 'postText' }, body)); p.addEventListener('click', () => window.__clicked.push(id)); return p; };
+    feed.append(post('alice.bsky.social', '3aaa', 'A GOOD thread on tide pools'), post('rage.bsky.social', '3bbb', 'BAD dunk on someone'), post('pics.bsky.social', '3ccc', ''), post('muted.bsky.social', '3ddd', 'GOOD but muted'));
+  } else if (host.startsWith('www.threads.')) {
+    const post = (user, id, body, quoted) => {
+      const when = el('a', { href: `/@${user}/post/${id}` }, el('time', {}, '2h'));
+      when.addEventListener('click', e => e.preventDefault());
+      const p = el('div', { 'data-pressable-container': 'true' }, el('a', { href: '/@' + user }, el('span', { dir: 'auto' }, user)), when, el('span', { dir: 'auto' }, body), el('span', { dir: 'auto' }, '1.2K'));
+      if (quoted) p.append(el('div', { 'data-pressable-container': 'true' }, el('a', { href: '/@other/post/Qqq' }, el('time', {}, '1d')), el('span', { dir: 'auto' }, 'the quoted post text')));
+      return p;
+    };
+    feed.append(post('mathgrid', 'Taaa', 'A GOOD note about primes'), post('ragebait', 'Tbbb', 'BAD outrage of the day'), post('quoter', 'Tccc', 'A GOOD comment on this', true));
+  } else if (host === 'www.facebook.com') {
+    const NS = 'http://www.w3.org/2000/svg';
+    const post = (author, body, audience, extra) => {
+      const icon = document.createElementNS(NS, 'svg'); icon.setAttribute('title', audience);
+      const p = el('div', { role: 'article' }, el('div', { 'data-ad-rendering-role': 'profile_name' }, el('h2', {}, el('a', { href: 'https://www.facebook.com/' + author.replace(/\s/g, '') + '?__cft__=x' }, author))), icon);
+      if (body) p.append(el('div', { 'data-ad-rendering-role': 'story_message', 'data-ad-preview': 'message', 'data-ad-comet-preview': 'message' }, body));
+      if (extra) p.append(extra);
+      return p;
+    };
+    feed.append(
+      post('Space Agency', 'A GOOD update on the mission with details', 'Shared with Public', el('a', { href: 'https://www.facebook.com/SpaceAgency/posts/pfbid0abc?__cft__=y' }, '2d')),
+      post('Outrage Page', 'BAD: you will be furious about this', 'Shared with Public'),
+      post('A Close Friend', 'A GOOD private note about my family holiday', 'Shared with Your friends'),
+      post('Hobby Group Member', 'A GOOD question in a public group', 'Shared with Public group'),
+      post('Private Group Member', 'A GOOD secret in a private group', 'Shared with Members of Secret Club'),
+      el('div', { role: 'article', class: 'skeleton' }, el('div', { 'aria-label': 'Loading...' })),
+      post('Photo Page', '', 'Shared with Public'),
+      post('Chatty Page', 'A GOOD post that has comments under it', 'Shared with Public', el('div', { role: 'article', 'aria-label': 'Comment by Someone' }, el('div', { 'data-ad-rendering-role': 'profile_name' }, 'Someone'), 'a BAD comment')),
+    );
+  } else if (host === 'www.linkedin.com') {
+    const post = (id, author, body) => el('div', { 'data-urn': 'urn:li:activity:' + id, class: 'feed-shared-update-v2' }, el('div', { class: 'update-components-actor__title' }, el('span', { 'aria-hidden': 'true' }, author), el('span', { class: 'visually-hidden' }, author)), el('div', { class: 'update-components-text' }, body));
+    feed.append(post('7001', 'Ada Engineer', 'A GOOD write-up of a migration'), post('7002', 'Growth Guru', 'BAD: agree? Thoughts? 🚀'));
+  }
+  window.__go = path => { history.pushState({}, '', path); feed.append(document.createComment('nav')); };
+</script>
+</body>
+</html>

@@ -20,6 +20,8 @@ function browserPath() {
   return found;
 }
 
+export const OTHER_HOSTS = ['www.reddit.com', 'news.ycombinator.com', 'bsky.app', 'www.threads.com', 'www.threads.net', 'www.facebook.com', 'www.linkedin.com'];
+
 export const SCORES = {
   'Reinventing Entropy': 0.9, CRAZIEST: 0.05, Navier: 0.85, Reacting: 0.1, fusion: 0.8, millionaires: 0.03, CPU: 0.75, DRAMA: 0.04,
   Fourier: 0.9, INSANE: 0.08, neuron: 0.82, '5am': 0.12, 'Late arrival': 0.2, GOOD: 0.9, BAD: 0.1, 'neural network': 0.91,
@@ -36,6 +38,7 @@ export async function launch({ headless = true, viewport = { width: 1280, height
   const id = sw.url().split('/')[2];
   await ctx.route('https://www.youtube.com/**', route => route.fulfill({ contentType: 'text/html', body: fixture('youtube.html') }));
   await ctx.route('https://x.com/**', route => route.fulfill({ contentType: 'text/html', body: fixture('x.html') }));
+  for (const host of OTHER_HOSTS) await ctx.route(`https://${host}/**`, route => route.fulfill({ contentType: 'text/html', body: fixture('sites.html') }));
   await installMock(sw);
   const close = async () => { await ctx.close(); fs.rmSync(profile, { recursive: true, force: true }); };
   return { ctx, sw, id, close, options: `chrome-extension://${id}/options.html`, popup: `chrome-extension://${id}/popup.html` };

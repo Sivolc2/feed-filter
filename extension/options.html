@@ -93,17 +93,14 @@
 
   <div class="panel">
     <h2>3. Where to filter</h2>
-    <h3>YouTube</h3>
-    <div class="checks" id="pages-youtube"></div>
-    <h3>X</h3>
-    <div class="checks" id="pages-x"></div>
+    <div id="pages"></div>
     <div class="checks">
       <label><input type="checkbox" id="shorts"> Black out Shorts</label>
       <label><input type="checkbox" id="signal"> A 👎 in the feed also tells the site "Not interested"</label>
     </div>
     <div class="cols">
-      <div><h3>Always keep</h3><textarea class="list" id="always" spellcheck="false" placeholder="One channel name or @handle per line"></textarea></div>
-      <div><h3>Never keep</h3><textarea class="list" id="never" spellcheck="false" placeholder="One channel name or @handle per line"></textarea></div>
+      <div><h3>Always keep</h3><textarea class="list" id="always" spellcheck="false" placeholder="One per line: a channel name, @handle, r/subreddit or site (example.com)"></textarea></div>
+      <div><h3>Never keep</h3><textarea class="list" id="never" spellcheck="false" placeholder="One per line: a channel name, @handle, r/subreddit or site (example.com)"></textarea></div>
     </div>
     <div class="row" style="margin-top:10px"><button id="saveLists">Save lists</button><span class="meta">Listed sources skip the judge, so they cost nothing. Page and list changes apply when you next load a feed.</span></div>
   </div>
@@ -126,7 +123,7 @@
   </div>
 
   <div class="row" style="margin-bottom:6px">
-    <select id="source"><option value="">All sources</option><option value="youtube">YouTube feed</option><option value="x">X feed</option><option value="scan">Scans</option></select>
+    <select id="source"><option value="">All sources</option></select>
     <select id="show"><option value="all">Kept and filtered</option><option value="keep">Kept only</option><option value="skip">Filtered only</option><option value="unvoted">Not voted yet</option></select>
     <span id="count"></span>
     <button id="clear" style="margin-left:auto">Clear history</button>

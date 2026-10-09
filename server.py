@@ -20,8 +20,18 @@ PORT = int(os.environ.get("FEED_PORT", "8953"))
 MAX_BODY = 1_000_000
 MAX_ITEMS = 60
 HOSTS = {f"{HOST}:{PORT}", f"localhost:{PORT}", f"127.0.0.1:{PORT}"} | {h.strip() for h in os.environ.get("FEED_ALLOWED_HOSTS", "").split(",") if h.strip()}
-ITEM_ID = re.compile(r"^(yt|x):[\w-]{1,40}$")
-ITEM_URL = re.compile(r"^https://(www\.youtube\.com|x\.com)/")
+ITEM_ID = re.compile(r"^[a-z]{1,4}:[\w-]{1,60}$")
+# source -> (id prefix, origin its links must start with). Mirrors extension/sites.js.
+SOURCES = {
+    "youtube": ("yt", "https://www.youtube.com"),
+    "x": ("x", "https://x.com"),
+    "reddit": ("rd", "https://www.reddit.com"),
+    "hackernews": ("hn", "https://news.ycombinator.com"),
+    "bluesky": ("bs", "https://bsky.app"),
+    "threads": ("th", "https://www.threads.com"),
+    "facebook": ("fb", "https://www.facebook.com"),
+    "linkedin": ("li", "https://www.linkedin.com"),
+}
 PAGE_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'"
 
 
@@ -41,10 +51,10 @@ def clean_items(items):
     for it in items:
         ok = (
             isinstance(it, dict)
-            and isinstance(it.get("id"), str) and ITEM_ID.match(it["id"])
-            and isinstance(it.get("url"), str) and ITEM_URL.match(it["url"])
+            and isinstance(it.get("source"), str) and it["source"] in SOURCES
+            and isinstance(it.get("id"), str) and ITEM_ID.match(it["id"]) and it["id"].startswith(SOURCES[it["source"]][0] + ":")
+            and isinstance(it.get("url"), str) and it["url"].startswith(SOURCES[it["source"]][1] + "/")
             and isinstance(it.get("text"), str) and it["text"].strip()
-            and it.get("source") in ("youtube", "x")
         )
         if ok:
             out.append({"id": it["id"], "source": it["source"], "text": it["text"][:600], "url": it["url"][:300]})

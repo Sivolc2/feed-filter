@@ -1,56 +1,29 @@
 // Reads feed tiles, asks the judge (via background.js) about them, and blacks out the ones that fail.
 // If the judge errors (no key, out of credit, server down) tiles are left unfiltered and a notice is shown.
-const YT = location.host.includes('youtube');
-const SITE = YT ? 'youtube' : 'x';
-const TILES = YT
-  ? 'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer, yt-lockup-view-model'
-  : 'article';
+const SITE_KEY = Object.keys(FF_SITES).find(key => FF_SITES[key].hosts.includes(location.host));
+const site = FF_SITES[SITE_KEY];
+const TILES = site.tiles;
+const pageKind = () => site.kind(location.pathname);
 
-const text = (el, sel) => (el.querySelector(sel)?.textContent || '').replace(/\s+/g, ' ').trim();
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 const send = (path, body) => new Promise(done => chrome.runtime.sendMessage({ path, body }, r => done(chrome.runtime.lastError || !r ? { error: 'Feed filter was reloaded. Refresh this page.' } : r)));
 
-function pageKind() {
-  const path = location.pathname;
-  if (YT) {
-    if (path === '/') return 'home';
-    if (path === '/results') return 'search';
-    if (path === '/watch') return 'watch';
-    if (path.startsWith('/feed/subscriptions')) return 'subscriptions';
-    return 'other';
-  }
-  if (path === '/home') return 'home';
-  if (path.startsWith('/search') || path.startsWith('/explore')) return 'search';
-  return 'other';
-}
-
-function extract(tile) {
-  if (YT) {
-    const href = tile.querySelector('a[href*="/watch?v="], a[href^="/shorts/"]')?.getAttribute('href');
-    if (!href || !href.startsWith('/')) return null;
-    const short = href.startsWith('/shorts/');
-    const id = short ? href.split('/')[2].split('?')[0] : new URLSearchParams(href.split('?')[1]).get('v');
-    const title = text(tile, '#video-title, .ytLockupMetadataViewModelTitle, .yt-lockup-metadata-view-model__title, h3');
-    const channel = text(tile, 'ytd-channel-name a, .ytContentMetadataViewModelMetadataText, .yt-content-metadata-view-model__metadata-text, a[href^="/@"]');
-    if (!id || !title) return null;
-    return { id: 'yt:' + id, source: 'youtube', short, author: channel, text: `${title} — ${channel}`, url: 'https://www.youtube.com' + href };
-  }
-  // X serves two layouts: the classic one with data-testid hooks and a newer one with bare articles.
-  const link = (tile.querySelector('a[href*="/status/"] time')?.closest('a') || tile.querySelector('a[href*="/status/"]'))?.getAttribute('href');
-  const body = text(tile, '[data-testid="tweetText"]') || tile.innerText.replace(/\s+/g, ' ').trim();
-  // Posts from protected accounts are private: never send them anywhere.
-  if (!link || !link.startsWith('/') || !body || tile.querySelector('[data-testid="icon-lock"]')) return null;
-  const author = link.split('/')[1];
-  return { id: 'x:' + link.split('/status/')[1].split(/[/?]/)[0], source: 'x', author, text: `@${author}: ${body}`, url: 'https://x.com' + link };
+// Reads a tile the first time its item is seen. Returns the item to judge, or null to leave it alone.
+function extract(tile, id) {
+  const got = site.read(tile);
+  if (!got || !got.text) return null;
+  const url = got.url.startsWith('/') ? site.origin + got.url : got.url;
+  return { id, source: SITE_KEY, short: !!got.short, author: got.author || '', group: got.group || '', text: got.text, url };
 }
 
 // The sites' menus ignore a bare click(); they need the pointer events that precede one.
 const press = el => { for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, composed: true, view: window })); };
 
-// Passes a downvote on to the site by choosing "Not interested" in the tile's own menu. English UI only.
+// Passes a downvote on to the site by choosing "Not interested" in the tile's own menu, on the
+// sites where such an entry exists. English UI only.
 async function signal(tile) {
-  if (!config.signal) return;
-  const button = tile.querySelector(YT ? 'button[aria-label="More actions"], button[aria-label="Action menu"]' : '[data-testid="caret"]');
+  if (!config.signal || !site.menu) return;
+  const button = tile.querySelector(site.menu);
   if (!button) return;
   press(button);
   for (let i = 0; i < 10; i++) {
@@ -137,14 +110,14 @@ let config = null; // { pages, signal } from the extension settings
 let queue = [], timer = null, sweepTimer = null;
 
 function setPageClasses(state) {
-  const on = !!(state && state.enabled && config.pages[SITE][pageKind()]);
+  const on = !!(state && state.enabled && config.pages[SITE_KEY]?.[pageKind()]);
   document.documentElement.classList.toggle('ff-on', on);
   document.documentElement.classList.toggle('ff-noshorts', on && !!state.block_shorts);
 }
 
 function sweep() {
   sweepTimer = null;
-  if (!config.pages[SITE][pageKind()]) {
+  if (!config.pages[SITE_KEY]?.[pageKind()]) {
     // This kind of page is switched off: take our marks away and leave it alone.
     clearMarks();
     setPageClasses(null);
@@ -152,12 +125,16 @@ function sweep() {
   }
   for (const tile of document.querySelectorAll(TILES)) {
     if (tile.parentElement.closest(TILES)) continue;
-    const item = extract(tile);
+    const raw = site.id(tile);
+    if (!raw) continue;
+    const id = site.prefix + ':' + raw;
+    // Sites reuse tile elements for new items, so key on the id rather than the element.
+    if (tile.dataset.ffId === id && tile.dataset.ff !== undefined && tile.querySelector(':scope > .ff-veil')) continue;
+    if (verdicts.has(id)) { tile.dataset.ffId = id; paint(tile); continue; }
+    // Only now read the tile's text: it is the costly part and is needed once per item.
+    const item = extract(tile, id);
     if (!item) continue;
-    // YouTube reuses tile elements for new videos, so key on the id rather than the element.
-    if (tile.dataset.ffId === item.id && tile.dataset.ff !== undefined && tile.querySelector(':scope > .ff-veil')) continue;
-    tile.dataset.ffId = item.id;
-    if (verdicts.has(item.id)) { paint(tile); continue; }
+    tile.dataset.ffId = id;
     show(tile, 'pending', 'checking…');
     queue.push({ tile, item });
   }

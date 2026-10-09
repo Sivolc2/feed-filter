@@ -219,6 +219,7 @@ try {
 } catch (e) {
   t.check('test run completed without crashing', false, e.stack);
 }
+try { await (await import('./e2e-sites.mjs')).run(globalThis.__shared); } catch (e) { t.check('site tests completed without crashing', false, e.stack); }
 t.check('no uncaught errors in any extension page or the service worker', errors.length === 0, errors.slice(0, 5));
 await close();
 process.exit(t.done() ? 1 : 0);

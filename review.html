@@ -69,7 +69,7 @@
   </div>
 
   <div class="row" style="margin-bottom:6px">
-    <select id="source"><option value="">All sources</option><option value="scan">Scans</option><option value="youtube">YouTube feed</option><option value="x">X feed</option></select>
+    <select id="source"><option value="">All sources</option></select>
     <select id="show"><option value="all">Kept and filtered</option><option value="keep">Kept only</option><option value="skip">Filtered only</option><option value="unvoted">Not voted yet</option></select>
     <span id="count" class="meta"></span>
   </div>
@@ -109,6 +109,12 @@ function render() {
   $('useBest').style.display = better ? '' : 'none';
   if (better) $('useBest').textContent = `Use ${c.best_threshold.toFixed(2)} (${pct(c.best_agreement)})`;
 
+  const sources = [...new Set(data.items.map(it => it.source))].sort();
+  if (sources.join() !== [...$('source').options].slice(1).map(o => o.value).join()) {
+    const picked = $('source').value;
+    $('source').replaceChildren(new Option('All sources', ''), ...sources.map(key => new Option(key, key)));
+    $('source').value = sources.includes(picked) ? picked : '';
+  }
   const src = $('source').value, show = $('show').value;
   const items = data.items.filter(it => it.p !== null && (!src || it.source === src)).map(it => ({ ...it, keep: it.vote ? it.vote > 0 : it.p >= s.threshold }))
     .filter(it => show === 'all' || (show === 'unvoted' ? !it.vote : (show === 'keep') === it.keep))

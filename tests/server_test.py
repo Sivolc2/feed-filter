@@ -125,6 +125,8 @@ hostile = [
     item(10, url="javascript:alert(1)"), item(11, url="https://evil.example/x"), item(12, url="http://www.youtube.com/watch"),
     {**item(13), "id": "yt:../../etc"}, {**item(14), "id": "'; DROP TABLE items;--"}, item(15, text=5), item(16, text="   "),
     item(17, source="scan"), "not a dict", None, {**item(18), "id": ["yt:a"]},
+    {**item(20), "id": "rd:vid20"}, {**item(21), "source": "reddit"}, item(22, url="https://www.youtube.com.evil.example/watch"),
+    item(23, source="__class__"), item(24, source=["youtube"]),
 ]
 s, b, _ = call("POST", "/api/judge", {"items": hostile})
 check("hostile items are all dropped", s == 200 and b["results"] == {}, (s, b))
@@ -132,6 +134,16 @@ s, b, _ = call("POST", "/api/judge", {"items": [item(19, text="GOOD " + "x" * 50
 with judge.db() as con:
     stored = con.execute("SELECT text FROM items WHERE id = 'yt:vid19'").fetchone()["text"]
 check("long text is truncated before storage", len(stored) == 600, len(stored))
+other_sites = [
+    {"id": "rd:abc", "source": "reddit", "text": "GOOD post", "url": "https://www.reddit.com/r/x/comments/abc/"},
+    {"id": "hn:123", "source": "hackernews", "text": "GOOD story", "url": "https://news.ycombinator.com/item?id=123"},
+    {"id": "bs:3k", "source": "bluesky", "text": "BAD post", "url": "https://bsky.app/profile/a/post/3k"},
+    {"id": "th:Dx", "source": "threads", "text": "GOOD post", "url": "https://www.threads.com/@a/post/Dx"},
+    {"id": "fb:1a2b3c", "source": "facebook", "text": "BAD post", "url": "https://www.facebook.com/"},
+    {"id": "li:7001", "source": "linkedin", "text": "GOOD post", "url": "https://www.linkedin.com/feed/update/urn:li:activity:7001/"},
+]
+s, b, _ = call("POST", "/api/judge", {"items": other_sites})
+check("items from every supported site are accepted", s == 200 and len(b["results"]) == 6 and b["results"]["bs:3k"]["p"] == 0.1, (s, b))
 check("too many items is refused", call("POST", "/api/judge", {"items": [item(100 + i) for i in range(61)]})[0] == 400)
 check("items that is not a list is refused", call("POST", "/api/judge", {"items": "abc"})[0] == 400)
 check("missing items is refused", call("POST", "/api/judge", {})[0] == 400)
@@ -151,7 +163,7 @@ check("vote true is refused", call("POST", "/api/vote", {"id": "yt:vid1", "vote"
 check("vote 0 is refused", call("POST", "/api/vote", {"id": "yt:vid1", "vote": 0})[0] == 400)
 check("vote with non-string id is refused", call("POST", "/api/vote", {"id": {"a": 1}, "vote": 1})[0] == 400)
 s, b, _ = call("GET", "/api/items")
-check("server still healthy after all of that", s == 200 and len(b["items"]) == 3 and b["state"]["threshold"] == 0.5, (s, b if s != 200 else len(b["items"])))
+check("server still healthy after all of that", s == 200 and len(b["items"]) == 9 and b["state"]["threshold"] == 0.5, (s, b if s != 200 else len(b["items"])))
 check("state.json is strict JSON", "NaN" not in (work / "data" / "state.json").read_text())
 
 # --- normal use ---

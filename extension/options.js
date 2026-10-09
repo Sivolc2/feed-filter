@@ -1,11 +1,7 @@
-import { PRESETS, DEFAULTS } from './local.js';
+import { PRESETS, DEFAULTS, withPageDefaults } from './local.js';
 
 const $ = id => document.getElementById(id);
 const pct = x => Math.round(x * 100) + '%';
-const PAGE_LABELS = {
-  youtube: { home: 'Home', search: 'Search results', watch: 'Watch page sidebar', subscriptions: 'Subscriptions', other: 'Everything else (channels, playlists, history)' },
-  x: { home: 'Home timeline', search: 'Search and Explore', other: 'Everything else (profiles, threads, notifications)' },
-};
 let data = null, proposal = null, local = {}, keepDirty = false;
 
 async function api(path, body) {
@@ -38,13 +34,21 @@ function renderLocal() {
   $('signal').checked = local.signal;
   $('always').value = local.always; $('never').value = local.never;
   $('dailyCap').value = local.dailyCap;
-  for (const site of ['youtube', 'x']) {
-    $('pages-' + site).replaceChildren(...Object.entries(PAGE_LABELS[site]).map(([kind, label]) =>
-      checkbox(label, local.pages[site][kind], async on => {
-        local.pages[site][kind] = on;
+  $('pages').replaceChildren(...Object.entries(FF_SITES).map(([key, site]) => {
+    const block = document.createElement('div');
+    const title = document.createElement('h3');
+    title.textContent = site.label;
+    const boxes = document.createElement('div');
+    boxes.className = 'checks';
+    boxes.id = 'pages-' + key;
+    boxes.append(...Object.entries(site.pages).map(([kind, [label]]) =>
+      checkbox(label, local.pages[key][kind], async on => {
+        local.pages[key][kind] = on;
         await chrome.storage.local.set({ pages: local.pages });
       })));
-  }
+    block.append(title, boxes);
+    return block;
+  }));
   if (local.lastError && Date.now() - local.lastError.at < 3600e3) $('status').textContent = `Last problem while filtering: ${local.lastError.message}`;
 
   const days = Object.entries(local.stats).sort().reverse();
@@ -58,7 +62,7 @@ function renderLocal() {
 
 async function load() {
   const stored = await chrome.storage.local.get({ ...DEFAULTS, stats: {} });
-  local = { ...stored, pages: { youtube: { ...DEFAULTS.pages.youtube, ...stored.pages?.youtube }, x: { ...DEFAULTS.pages.x, ...stored.pages?.x } } };
+  local = { ...stored, pages: withPageDefaults(stored.pages) };
   renderLocal();
   try { data = await api('/api/items'); } catch (e) { $('status').textContent = e.message; return; }
   if (!keepDirty) $('keep').value = data.keep;
@@ -77,6 +81,13 @@ function render() {
   $('useBest').style.display = better ? '' : 'none';
   if (better) $('useBest').textContent = `Use ${c.best_threshold.toFixed(2)} (${pct(c.best_agreement)})`;
 
+  // The source filter lists whatever sources the history actually holds.
+  const sources = [...new Set(data.items.map(it => it.source))].sort();
+  if (sources.join() !== [...$('source').options].slice(1).map(o => o.value).join()) {
+    const picked = $('source').value;
+    $('source').replaceChildren(new Option('All sources', ''), ...sources.map(key => new Option(FF_SITES[key]?.label || (key === 'scan' ? 'Scans' : key), key)));
+    $('source').value = sources.includes(picked) ? picked : '';
+  }
   const src = $('source').value, show = $('show').value;
   const items = data.items.filter(it => it.p !== null && (!src || it.source === src))
     .map(it => ({ ...it, keep: it.vote ? it.vote > 0 : it.p >= s.threshold }))

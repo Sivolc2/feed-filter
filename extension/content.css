@@ -31,3 +31,4 @@ html.ff-on ytd-video-preview { display: none !important; }
 }
 #ff-notice button { all: unset; cursor: pointer; color: #d9b36a; white-space: nowrap; }
 [data-ff-vote="none"] > .ff-badge { display: none !important; }
+html.ff-on shreddit-ad-post { display: none !important; }

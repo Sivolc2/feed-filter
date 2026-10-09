@@ -2,22 +2,25 @@
 // /api/* goes to the user's server if one is set, otherwise to the judge in local.js.
 // /ext/* is always handled here. Content scripts run inside web pages, so they may only call
 // the few routes in FROM_PAGES and cannot read the extension's storage (and so not the key).
+import './sites.js';
 import { routes as local, settings, clear, test, importVotes } from './local.js';
 
 chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
 
 const FROM_PAGES = new Set(['/ext/config', '/api/judge', '/api/vote', '/ext/options']);
-const ITEM_ID = /^(yt|x):[\w-]{1,40}$/;
-const ITEM_URL = /^https:\/\/(www\.youtube\.com|x\.com)\//;
+// An item is well-formed when its source is a known site, its id carries that site's prefix,
+// and its link points at that site.
+const ITEM_ID = /^[a-z]{1,4}:[\w-]{1,60}$/;
+const wellFormed = it => !!it && typeof it.id === 'string' && ITEM_ID.test(it.id) && typeof it.url === 'string' && typeof it.text === 'string' && !!it.text.trim()
+  && Object.hasOwn(FF_SITES, it.source) && it.id.startsWith(FF_SITES[it.source].prefix + ':') && it.url.startsWith(FF_SITES[it.source].origin + '/');
 const today = () => new Date().toLocaleDateString('en-CA');
 const names = list => new Set(String(list).split('\n').map(name).filter(Boolean));
 const name = text => String(text || '').trim().replace(/^@/, '').toLowerCase();
 
 function cleanItems(items) {
   if (!Array.isArray(items)) return [];
-  return items.slice(0, 60).filter(it => it && ITEM_ID.test(it.id) && ITEM_URL.test(it.url) && typeof it.text === 'string' && it.text.trim()
-    && (it.source === 'youtube' || it.source === 'x'))
-    .map(it => ({ id: it.id, source: it.source, url: it.url.slice(0, 300), text: it.text.slice(0, 600), author: String(it.author || '').slice(0, 100) }));
+  return items.slice(0, 60).filter(wellFormed)
+    .map(it => ({ id: it.id, source: it.source, url: it.url.slice(0, 300), text: it.text.slice(0, 600), author: String(it.author || '').slice(0, 100), group: String(it.group || '').slice(0, 100) }));
 }
 
 async function backend(path, body, s) {
@@ -72,9 +75,10 @@ async function judge(body, s) {
   const always = names(s.always), never = names(s.never);
   const results = {}, rest = [];
   for (const it of items) {
-    const who = name(it.author);
-    if (who && never.has(who)) results[it.id] = { p: null, vote: null, rule: 'never' };
-    else if (who && always.has(who)) results[it.id] = { p: null, vote: null, rule: 'always' };
+    // A list entry can name the author (channel, account, site) or the group it posted in (on Reddit, the user).
+    const who = [name(it.author), name(it.group)].filter(Boolean);
+    if (who.some(n => never.has(n))) results[it.id] = { p: null, vote: null, rule: 'never' };
+    else if (who.some(n => always.has(n))) results[it.id] = { p: null, vote: null, rule: 'always' };
     else rest.push(it);
   }
   let state, meta = { scored: 0, cost: 0 };
@@ -83,7 +87,7 @@ async function judge(body, s) {
     const { stats = {} } = await chrome.storage.local.get('stats');
     // A server enforces its own cap (FEED_DAILY_CAP) and ignores this field.
     const budget = Math.max(0, s.dailyCap - (stats[today()]?.scored || 0));
-    const res = await backend('/api/judge', { items: rest.map(({ author, ...it }) => it), budget }, s);
+    const res = await backend('/api/judge', { items: rest.map(({ author, group, ...it }) => it), budget }, s);
     state = cleanState(res.state);
     Object.assign(results, cleanResults(res.results, rest));
     if (res.meta) meta = res.meta;
@@ -128,8 +132,7 @@ async function importAll(file, s) {
   if (file.mode === 'fast' || file.mode === 'smart') stateChanges.mode = file.mode;
   if (Object.keys(stateChanges).length) await backend('/api/state', stateChanges, s);
   const votes = (Array.isArray(file.votes) ? file.votes : []).slice(0, 5000)
-    .filter(v => v && ITEM_ID.test(v.id) && ITEM_URL.test(v.url) && typeof v.text === 'string' && v.text.trim()
-      && (v.source === 'youtube' || v.source === 'x') && (v.vote === 1 || v.vote === -1))
+    .filter(v => wellFormed(v) && (v.vote === 1 || v.vote === -1))
     .map(v => ({ id: v.id, source: v.source, text: v.text.slice(0, 600), url: v.url.slice(0, 300), vote: v.vote }));
   if (!s.serverUrl) await importVotes(votes);
   if (typeof file.keep === 'string') await backend('/api/keep', { keep: file.keep, threshold: file.threshold }, s);

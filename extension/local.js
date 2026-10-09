@@ -1,5 +1,7 @@
 // The judge, run inside the extension with the user's own OpenRouter key.
 // Mirrors the endpoints of the optional server (../server.py) so the pages work with either.
+import './sites.js';
+
 const JEV_URL = 'https://openrouter.ai/api/alpha/decisions';
 const JEV_MODEL = '~typesafe/jev-latest';
 const CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -35,13 +37,15 @@ export const PRESETS = {
 export const DEFAULTS = {
   apiKey: '', serverUrl: '', enabled: true, mode: 'fast', threshold: 0.5, block_shorts: true, keep: PRESETS['Science and maths'],
   signal: true, always: '', never: '', dailyCap: 3000, lastError: null,
-  pages: { youtube: { home: true, search: true, watch: true, subscriptions: false, other: false }, x: { home: true, search: true, other: false } },
+  pages: Object.fromEntries(Object.entries(FF_SITES).map(([key, site]) => [key, Object.fromEntries(Object.entries(site.pages).map(([kind, [, on]]) => [kind, on]))])),
 };
+// Stored page switches, completed with defaults for any site or page kind added since they were saved.
+export const withPageDefaults = pages => Object.fromEntries(Object.keys(DEFAULTS.pages).map(key => [key, { ...DEFAULTS.pages[key], ...pages?.[key] }]));
 const STATE_KEYS = ['enabled', 'mode', 'threshold', 'block_shorts'];
 
 export async function settings() {
   const s = { ...DEFAULTS, ...(await chrome.storage.local.get(Object.keys(DEFAULTS))) };
-  s.pages = { youtube: { ...DEFAULTS.pages.youtube, ...s.pages?.youtube }, x: { ...DEFAULTS.pages.x, ...s.pages?.x } };
+  s.pages = withPageDefaults(s.pages);
   return s;
 }
 const publicState = s => Object.fromEntries(STATE_KEYS.map(k => [k, s[k]]));
